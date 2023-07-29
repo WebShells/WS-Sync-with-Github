@@ -13,20 +13,21 @@ function time_since_creation($created_at) {
     }
 }
 
-function github_issues_shortcode($atts) {
+function gitsync_issues_shortcode($atts) {
     $atts = shortcode_atts(array(
-        'repository' => get_option('github_plugin_repository', 'opensourcepos'),
-        'owner' => get_option('github_plugin_owner', 'opensourcepos'),
-    ), $atts, 'github_data');
+        'token' => '',
+        'repository' => '',
+        'owner' => '',
+    ), $atts, 'gitsync_issues');
 
     // Make API request for open issues using cURL
     $issues_api_url = "https://api.github.com/repos/{$atts['owner']}/{$atts['repository']}/issues?state=open";
     $headers = array(
-        'Authorization: Your-Token-Here',
+        'Authorization: token ' . $atts['token'],
         'User-Agent: Your-User-Agent', // Add your own User-Agent here
     );
 
-    // Initialize cURL session for issues
+	// Initialize cURL session for issues
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $issues_api_url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -60,7 +61,6 @@ function github_issues_shortcode($atts) {
         $last_10_issues = array_slice($issues_data, 0, 10);
 
         // Display issues
-       // $output .= '<h2>Open Issues</h2>';
         $output .= '<ul>';
         foreach ($last_10_issues as $issue) {
             // Check if the issue is not a pull request
@@ -96,17 +96,20 @@ function github_issues_shortcode($atts) {
 
     return $output;
 }
-add_shortcode('github_issues', 'github_issues_shortcode');
-function github_commits_shortcode($atts) {
+
+add_shortcode('gitsync_issues', 'gitsync_issues_shortcode');
+
+function gitsync_commits_shortcode($atts) {
     $atts = shortcode_atts(array(
-        'repository' => get_option('github_plugin_repository', 'opensourcepos'),
-        'owner' => get_option('github_plugin_owner', 'opensourcepos'),
-    ), $atts, 'github_data');
+        'token' => '',
+        'repository' => '',
+        'owner' => '',
+    ), $atts, 'gitsync_commits');
 
     // Make API request for open commits using cURL
     $commits_api_url = "https://api.github.com/repos/{$atts['owner']}/{$atts['repository']}/commits?per_page=10&sort=author-date&direction=desc";
     $headers = array(
-        'Authorization: Your-Token-Here',
+        'Authorization: token ' . $atts['token'],
         'User-Agent: Your-User-Agent', // Add your own User-Agent here
     );
 
@@ -132,7 +135,8 @@ function github_commits_shortcode($atts) {
     $commits_data = json_decode($commits_response, true);
 
     // Display the data
-    // $output = '<h2>New Commits</h2>';
+    $output = ''; // Initialize output variable
+
     if (!empty($commits_data)) {
         // Display commits
         $output .= '<ul>';
@@ -181,19 +185,20 @@ function github_commits_shortcode($atts) {
 
     return $output;
 }
-add_shortcode('github_commits', 'github_commits_shortcode');
 
+add_shortcode('gitsync_commits', 'gitsync_commits_shortcode');
 
-function github_pull_requests_shortcode($atts) {
+function gitsync_pull_requests_shortcode($atts) {
     $atts = shortcode_atts(array(
-        'repository' => 'opensourcepos',
-        'owner' => 'opensourcepos',
-    ), $atts, 'github_data');
+        'token' => '',
+        'repository' => '',
+        'owner' => '',
+    ), $atts, 'gitsync_pull_requests');
 
     // Make API request for open pull requests using cURL
     $pulls_api_url = "https://api.github.com/repos/{$atts['owner']}/{$atts['repository']}/pulls?state=open";
     $headers = array(
-        'Authorization: Your-Token-Here',
+        'Authorization: token ' . $atts['token'],
         'User-Agent: Your-User-Agent', // Add your own User-Agent here
     );
 
@@ -231,7 +236,6 @@ function github_pull_requests_shortcode($atts) {
         $last_10_pulls = array_slice($pulls_data, 0, 10);
 
         // Display pull requests
-       // $output .= '<h2>Open Pull Requests</h2>';
         $output .= '<ul>';
         foreach ($last_10_pulls as $pull) {
             // Generate list items for each pull request
@@ -264,5 +268,5 @@ function github_pull_requests_shortcode($atts) {
 
     return $output;
 }
-add_shortcode('github_pull_requests', 'github_pull_requests_shortcode');
 
+add_shortcode('gitsync_pull_requests', 'gitsync_pull_requests_shortcode');
