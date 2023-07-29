@@ -50,6 +50,7 @@ Displays a list of open pull requests from a GitHub repository.
 ```shortcode
 [gitsync_pull_requests token="YourGitHubToken" repository="YourRepository" owner="YourOwner"]
 ```
+![Screenshot](https://github.com/WebShells/Github-Sync-Wordpress/blob/main/Screenshot.png?raw=true)
 
 ### Important Notes
 
