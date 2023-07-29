@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: WS GitHub Sync Wordpress
-Plugin URI: https://github.com/WebShells/git-sync-wordpress
+Plugin URI: https://github.com/WebShells/github-sync-wordpress
 Description: Display GitHub repository issues, commits, and pull requests using shortcodes.
 Version: 1.0
 Author: WebShells ( WebShells Services Co. )
