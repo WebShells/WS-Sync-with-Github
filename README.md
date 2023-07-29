@@ -1,6 +1,7 @@
-WS Github Sync Wordpress, now you can easily show open issues, new commits, and open pull requests using this plugin and it's shortcodes.
+## WS Github Sync Wordpress Shortcodes 
 
-After downloading the archive file from releases section and adding it as a new plugin, just activate it and you are ready to use the shortcodes!
+Now you can easily show open issues, new commits, and open pull requests using this plugin and it's shortcodes.
+After downloading the archive file and adding it as a new plugin, just activate it and you are ready to use the shortcodes!
 
 ### 1. `[gitsync_issues]`
 
