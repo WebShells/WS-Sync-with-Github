@@ -148,52 +148,64 @@ function gitsync_commits_shortcode($atts) {
     // Display the data
     $output = ''; // Initialize output variable
 
-    if (!empty($commits_data)) {
+       if (!empty($commits_data)) {
         // Display commits
         $output .= '<ul>';
         foreach ($commits_data as $commit) {
-            // Check if the commit message contains "Translate-URL:", and if so, exclude the exact line that contains it
-            $commit_message = explode("\n", $commit['commit']['message']);
-            $filtered_message = '';
-            $found_translate_url = false;
-            foreach ($commit_message as $line) {
-                if (strpos($line, 'Translate-URL:') !== false) {
-                    $found_translate_url = true;
-                } else {
-                    // Remove line breaks within the commit message
-                    $filtered_message .= str_replace("\n", "", $line) . " ";
+            if (
+                isset($commit['author']['html_url']) &&
+                isset($commit['author']['avatar_url']) &&
+                isset($commit['commit']['author']['name']) &&
+                isset($commit['html_url']) &&
+                isset($commit['commit']['message']) &&
+                isset($commit['commit']['author']['date'])
+            ) {
+                // Check if the commit message contains "Translate-URL:", and if so, exclude the exact line that contains it
+                $commit_message = explode("\n", $commit['commit']['message']);
+                $filtered_message = '';
+                $found_translate_url = false;
+                foreach ($commit_message as $line) {
+                    if (strpos($line, 'Translate-URL:') !== false) {
+                        $found_translate_url = true;
+                    } else {
+                        // Remove line breaks within the commit message
+                        $filtered_message .= str_replace("\n", "", $line) . " ";
+                    }
                 }
+    
+                // Generate list items for each commit
+                $output .= '<li>';
+    
+                // Make the author image clickable and link to the user's GitHub profile
+                $output .= '<a href="' . esc_url($commit['author']['html_url']) . '" target="_blank">';
+                $output .= '<img src="' . esc_url($commit['author']['avatar_url']) . '" alt="' . esc_attr($commit['commit']['author']['name']) . '" width="24" height="24" style="vertical-align: middle; margin-right: 8px;" />';
+                $output .= '</a>';
+    
+                // Commit Number (Clickable)
+                $commit_number = substr($commit['sha'], 0, 7); // Extract the first 7 characters
+                $output .= '<a href="' . esc_url($commit['html_url']) . '" target="_blank">Commit #' . esc_html($commit_number) . '</a>';
+    
+                // Commit Message (remove any line breaks within the commit message)
+                $output .= ' - ' . esc_html($filtered_message);
+    
+                // Calculate the time since the commit was created
+                $time_since_creation = time_since_creation($commit['commit']['author']['date']);
+                $output .= ' - Since (' . $time_since_creation . ')';
+    
+                // Make the author name clickable and link to the user's GitHub profile
+                $output .= ' - <a href="' . esc_url($commit['author']['html_url']) . '" target="_blank">' . esc_html($commit['commit']['author']['name']) . '</a>';
+    
+                $output .= '</li>';
+            } else {
+                // Handle incomplete commit data
+                $output .= '<li>Weblate translation commit.</li>';
             }
-
-            // Generate list items for each commit
-            $output .= '<li>';
-
-            // Make the author image clickable and link to the user's GitHub profile
-            $output .= '<a href="' . esc_url($commit['author']['html_url']) . '" target="_blank">';
-            $output .= '<img src="' . esc_url($commit['author']['avatar_url']) . '" alt="' . esc_attr($commit['commit']['author']['name']) . '" width="24" height="24" style="vertical-align: middle; margin-right: 8px;" />';
-            $output .= '</a>';
-
-            // Commit Number (Clickable)
-            $commit_number = substr($commit['sha'], 0, 7); // Extract the first 7 characters
-            $output .= '<a href="' . esc_url($commit['html_url']) . '" target="_blank">Commit #' . esc_html($commit_number) . '</a>';
-
-            // Commit Message (remove any line breaks within the commit message)
-            $output .= ' - ' . esc_html($filtered_message);
-
-            // Calculate the time since the commit was created
-            $time_since_creation = time_since_creation($commit['commit']['author']['date']);
-            $output .= ' - Since (' . $time_since_creation . ')';
-
-            // Make the author name clickable and link to the user's GitHub profile
-            $output .= ' - <a href="' . esc_url($commit['author']['html_url']) . '" target="_blank">' . esc_html($commit['commit']['author']['name']) . '</a>';
-
-            $output .= '</li>';
         }
         $output .= '</ul>';
     } else {
         $output .= '<p>No new commits found.</p>';
     }
-
+    
     return $output;
 }
 
