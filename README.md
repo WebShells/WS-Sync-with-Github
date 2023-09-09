@@ -1,3 +1,5 @@
+<p align="center"><img src="WebShells.png" alt="WebShells Logo" width="auto" height="150"></p>
+
 ## WS Github Sync Wordpress Shortcodes 
 
 Now you can easily show open issues, new commits, and open pull requests using this plugin and it's shortcodes.
@@ -16,7 +18,7 @@ Displays a list of open issues from a GitHub repository.
 #### Usage
 
 ```shortcode
-[gitsync_issues token="YourGitHubToken" repository="YourRepository" owner="YourOwner"]
+[gitsync_issues token="YourGitHubToken" repository="YourRepository" owner="OwnerOfRepo"]
 ```
 
 ### 2. `[gitsync_commits]`
@@ -32,7 +34,7 @@ Displays a list of the latest commits from a GitHub repository.
 #### Usage
 
 ```shortcode
-[gitsync_commits token="YourGitHubToken" repository="YourRepository" owner="YourOwner"]
+[gitsync_commits token="YourGitHubToken" repository="YourRepository" owner="OwnerOfRepo"]
 ```
 
 ### 3. `[gitsync_pull_requests]`
@@ -48,7 +50,7 @@ Displays a list of open pull requests from a GitHub repository.
 #### Usage
 
 ```shortcode
-[gitsync_pull_requests token="YourGitHubToken" repository="YourRepository" owner="YourOwner"]
+[gitsync_pull_requests token="YourGitHubToken" repository="YourRepository" owner="OwnerOfRepo"]
 ```
 ![Screenshot](https://github.com/WebShells/Github-Sync-Wordpress/blob/main/Screenshot.png?raw=true)
 
@@ -56,7 +58,7 @@ Displays a list of open pull requests from a GitHub repository.
 
 - Before using these shortcodes, make sure you have a valid GitHub personal access token. You can create a token with appropriate permissions in your GitHub account settings.
 
-- Replace `YourGitHubToken`, `YourRepository`, and `YourOwner` with the appropriate values for your GitHub repository.
+- Replace `YourGitHubToken`, `YourRepository`, and `OwnerOfRepo` with the appropriate values for your GitHub repository.
 
 - Ensure that cURL is enabled on your server to make API requests to GitHub.
 
