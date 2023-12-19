@@ -1,12 +1,12 @@
 <?php
 /*
-Plugin Name: WS GitHub Sync Wordpress
-Plugin URI: https://github.com/WebShells/github-sync-wordpress
+Plugin Name: WS Sync with Github
+Plugin URI: https://github.com/WebShells/WS-Sync-with-Github
 Description: Display GitHub repository issues, commits, and pull requests using shortcodes.
 Version: 1.0
 Author: WebShells ( WebShells Services Co. )
 Author URI: https://www.wshells.ws
-Text Domain: github-sync-wordpress
+Text Domain: WS-Sync-with-Github
 */
 
 function time_since_creation($created_at) {
