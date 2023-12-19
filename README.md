@@ -1,8 +1,8 @@
 <p align="center"><img src="WebShells.png" alt="WebShells Logo" width="auto" height="150"></p>
 
-## WS Github Sync Wordpress Shortcodes 
+## WS Sync with Github Shortcodes 
 
-Now you can easily show open issues, new commits, and open pull requests using this plugin and it's shortcodes.
+Now you can easily show/display open issues, new commits, and open pull requests using this plugin and it's shortcodes on your Wordpress website.
 After downloading the [Plugin Files](https://github.com/WebShells/Github-Sync-Wordpress/releases/download/v1.0.0/WS-Github-Sync-Wordpress.zip) and uploading it as a new plugin, just activate it and you are ready to use the shortcodes!
 
 ### 1. `[gitsync_issues]`
@@ -52,7 +52,7 @@ Displays a list of open pull requests from a GitHub repository.
 ```shortcode
 [gitsync_pull_requests token="YourGitHubToken" repository="YourRepository" owner="OwnerOfRepo"]
 ```
-![Screenshot](https://github.com/WebShells/Github-Sync-Wordpress/blob/main/Screenshot.png?raw=true)
+![Screenshot](https://github.com/WebShells/WS-Sync-with-Github/blob/main/Screenshot.png?raw=true)
 
 ### Important Notes
 
