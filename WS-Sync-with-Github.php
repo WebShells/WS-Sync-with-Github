@@ -3,25 +3,112 @@
 Plugin Name: WS Sync with Github
 Plugin URI: https://github.com/WebShells/WS-Sync-with-Github
 Description: Display GitHub repository issues, commits, and pull requests using shortcodes.
-Version: 1.0
+Version: 1.1
 Author: WebShells ( WebShells Services Co. )
 Author URI: https://www.wshells.ws
 Text Domain: WS-Sync-with-Github
 */
 
-function time_since_creation($created_at) {
-    $current_time = time();
-    $time_diff = $current_time - strtotime($created_at);
-    
-    if ($time_diff < 60 * 60 * 24) { // Less than 1 day
-        return 'Today';
-    } elseif ($time_diff < 60 * 60 * 24 * 30) { // Less than 30 days
-        $days_ago = floor($time_diff / (60 * 60 * 24));
-        return $days_ago . ' ' . ($days_ago > 1 ? 'days' : 'day') . ' ago';
-    } else { // More than 30 days
-        $months_ago = floor($time_diff / (60 * 60 * 24 * 30));
-        return $months_ago . ' ' . ($months_ago > 1 ? 'months' : 'month') . ' ago';
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+function gitsync_time_since_creation($created_at) {
+    $created_timestamp = strtotime($created_at);
+
+    if (!$created_timestamp) {
+        return '';
     }
+
+    $time_diff = time() - $created_timestamp;
+
+    if ($time_diff < DAY_IN_SECONDS) {
+        return 'Today';
+    }
+
+    if ($time_diff < 30 * DAY_IN_SECONDS) {
+        $days_ago = (int) floor($time_diff / DAY_IN_SECONDS);
+        return $days_ago . ' ' . ($days_ago === 1 ? 'day' : 'days') . ' ago';
+    }
+
+    $months_ago = (int) floor($time_diff / (30 * DAY_IN_SECONDS));
+    return $months_ago . ' ' . ($months_ago === 1 ? 'month' : 'months') . ' ago';
+}
+
+function gitsync_fetch_github_data($endpoint, $token = '') {
+    $cache_key = 'gitsync_' . md5($endpoint . '|' . $token);
+    $cached_data = get_transient($cache_key);
+
+    if (false !== $cached_data) {
+        return $cached_data;
+    }
+
+    $headers = array(
+        'Accept' => 'application/vnd.github+json',
+        'User-Agent' => 'WS Sync with Github WordPress Plugin',
+    );
+
+    if (!empty($token)) {
+        $headers['Authorization'] = 'Bearer ' . $token;
+    }
+
+    $response = wp_remote_get($endpoint, array(
+        'timeout' => 15,
+        'headers' => $headers,
+    ));
+
+    if (is_wp_error($response)) {
+        return $response;
+    }
+
+    $status_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+
+    if (200 !== $status_code) {
+        return new WP_Error(
+            'gitsync_http_error',
+            sprintf('GitHub API returned HTTP %d.', $status_code)
+        );
+    }
+
+    $data = json_decode($body, true);
+
+    if (!is_array($data)) {
+        return new WP_Error('gitsync_invalid_json', 'Invalid response from GitHub API.');
+    }
+
+    set_transient($cache_key, $data, 5 * MINUTE_IN_SECONDS);
+
+    return $data;
+}
+
+function gitsync_render_error($message) {
+    return '<p>' . esc_html($message) . '</p>';
+}
+
+function gitsync_build_list_item($label, $item_url, $title, $time_since, $author_name, $author_url, $avatar_url, $avatar_alt) {
+    $output = '<li>';
+
+    if (!empty($avatar_url) && !empty($author_url)) {
+        $output .= '<a href="' . esc_url($author_url) . '" target="_blank" rel="noopener noreferrer">';
+        $output .= '<img src="' . esc_url($avatar_url) . '" alt="' . esc_attr($avatar_alt) . '" width="24" height="24" style="vertical-align: middle; margin-right: 8px;" />';
+        $output .= '</a>';
+    }
+
+    $output .= '<a href="' . esc_url($item_url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+    $output .= ' - ' . esc_html($title);
+
+    if (!empty($time_since)) {
+        $output .= ' - Since (' . esc_html($time_since) . ')';
+    }
+
+    if (!empty($author_name) && !empty($author_url)) {
+        $output .= ' - <a href="' . esc_url($author_url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($author_name) . '</a>';
+    }
+
+    $output .= '</li>';
+
+    return $output;
 }
 
 function gitsync_issues_shortcode($atts) {
@@ -31,41 +118,27 @@ function gitsync_issues_shortcode($atts) {
         'owner' => '',
     ), $atts, 'gitsync_issues');
 
-    // Make API request for open issues using cURL
-    $issues_api_url = "https://api.github.com/repos/{$atts['owner']}/{$atts['repository']}/issues?state=open";
-    $headers = array(
-        'Authorization: token ' . $atts['token'],
-        'User-Agent: Your-User-Agent', // Add your own User-Agent here
-    );
+    $owner = sanitize_text_field($atts['owner']);
+    $repository = sanitize_text_field($atts['repository']);
+    $token = trim($atts['token']);
 
-	// Initialize cURL session for issues
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $issues_api_url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-    // Execute cURL session for issues
-    $issues_response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-    // Close cURL session for issues
-    curl_close($ch);
-
-    // Check if the API request for issues was successful
-    if ($http_code !== 200) {
-        return '<p>Error retrieving issues data from GitHub API.</p>';
+    if (empty($owner) || empty($repository)) {
+        return gitsync_render_error('Repository owner and repository name are required.');
     }
 
-    // Check if the response is valid JSON
-    $issues_data = json_decode($issues_response, true);
+    $issues_api_url = add_query_arg(array('state' => 'open', 'per_page' => 100), sprintf('https://api.github.com/repos/%s/%s/issues', rawurlencode($owner), rawurlencode($repository)));
+    $issues_data = gitsync_fetch_github_data($issues_api_url, $token);
 
-    // Display the data
-    $output = ''; // Initialize output variable
+    if (is_wp_error($issues_data)) {
+        return gitsync_render_error('Error retrieving issues data from GitHub API.');
+    }
+
+    $output = '';
 
     if (!empty($issues_data)) {
         // Sort issues by created_at date in descending order (newest to oldest)
         usort($issues_data, function ($a, $b) {
-            return strtotime($b['created_at']) - strtotime($a['created_at']);
+            return strtotime($b['created_at'] ?? '') <=> strtotime($a['created_at'] ?? '');
         });
 
         // Get the latest 10 issues
@@ -76,28 +149,17 @@ function gitsync_issues_shortcode($atts) {
         foreach ($last_10_issues as $issue) {
             // Check if the issue is not a pull request
             if (!isset($issue['pull_request'])) {
-                // Generate list items for each issue
-                $output .= '<li>';
-
-                // Make the author image clickable and link to the user's GitHub profile
-                $output .= '<a href="' . esc_url($issue['user']['html_url']) . '" target="_blank">';
-                $output .= '<img src="' . esc_url($issue['user']['avatar_url']) . '" alt="' . esc_attr($issue['user']['login']) . '" width="24" height="24" style="vertical-align: middle; margin-right: 8px;" />';
-                $output .= '</a>';
-
-                // Issue Number (Clickable)
-                $output .= '<a href="' . esc_url($issue['html_url']) . '" target="_blank">Issue #' . esc_html($issue['number']) . '</a>';
-
-                // Issue Title
-                $output .= ' - ' . esc_html($issue['title']);
-
-                // Calculate the time since the issue was created
-                $time_since_creation = time_since_creation($issue['created_at']);
-                $output .= ' - Since (' . $time_since_creation . ')';
-
-                // Make the author name clickable and link to the user's GitHub profile
-                $output .= ' - <a href="' . esc_url($issue['user']['html_url']) . '" target="_blank">' . esc_html($issue['user']['login']) . '</a>';
-
-                $output .= '</li>';
+                $user = $issue['user'] ?? array();
+                $output .= gitsync_build_list_item(
+                    'Issue #' . ($issue['number'] ?? ''),
+                    $issue['html_url'] ?? '',
+                    $issue['title'] ?? '',
+                    gitsync_time_since_creation($issue['created_at'] ?? ''),
+                    $user['login'] ?? '',
+                    $user['html_url'] ?? '',
+                    $user['avatar_url'] ?? '',
+                    $user['login'] ?? ''
+                );
             }
         }
         $output .= '</ul>';
@@ -117,89 +179,59 @@ function gitsync_commits_shortcode($atts) {
         'owner' => '',
     ), $atts, 'gitsync_commits');
 
-    // Make API request for open commits using cURL
-    $commits_api_url = "https://api.github.com/repos/{$atts['owner']}/{$atts['repository']}/commits?per_page=10&sort=author-date&direction=desc";
-    $headers = array(
-        'Authorization: token ' . $atts['token'],
-        'User-Agent: Your-User-Agent', // Add your own User-Agent here
-    );
+    $owner = sanitize_text_field($atts['owner']);
+    $repository = sanitize_text_field($atts['repository']);
+    $token = trim($atts['token']);
 
-    // Initialize cURL session for commits
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $commits_api_url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-    // Execute cURL session for commits
-    $commits_response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-    // Close cURL session for commits
-    curl_close($ch);
-
-    // Check if the API request for commits was successful
-    if ($http_code !== 200) {
-        return '<p>Error retrieving commits data from GitHub API.</p>';
+    if (empty($owner) || empty($repository)) {
+        return gitsync_render_error('Repository owner and repository name are required.');
     }
 
-    // Check if the response is valid JSON
-    $commits_data = json_decode($commits_response, true);
+    $commits_api_url = add_query_arg(array('per_page' => 10), sprintf('https://api.github.com/repos/%s/%s/commits', rawurlencode($owner), rawurlencode($repository)));
+    $commits_data = gitsync_fetch_github_data($commits_api_url, $token);
 
-    // Display the data
-    $output = ''; // Initialize output variable
+    if (is_wp_error($commits_data)) {
+        return gitsync_render_error('Error retrieving commits data from GitHub API.');
+    }
 
-       if (!empty($commits_data)) {
+    $output = '';
+
+    if (!empty($commits_data)) {
         // Display commits
         $output .= '<ul>';
         foreach ($commits_data as $commit) {
-            if (
-                isset($commit['author']['html_url']) &&
-                isset($commit['author']['avatar_url']) &&
-                isset($commit['commit']['author']['name']) &&
-                isset($commit['html_url']) &&
-                isset($commit['commit']['message']) &&
-                isset($commit['commit']['author']['date'])
-            ) {
-                // Check if the commit message contains "Translate-URL:", and if so, exclude the exact line that contains it
-                $commit_message = explode("\n", $commit['commit']['message']);
-                $filtered_message = '';
-                $found_translate_url = false;
-                foreach ($commit_message as $line) {
-                    if (strpos($line, 'Translate-URL:') !== false) {
-                        $found_translate_url = true;
-                    } else {
-                        // Remove line breaks within the commit message
-                        $filtered_message .= str_replace("\n", "", $line) . " ";
-                    }
+            $author = $commit['author'] ?? array();
+            $commit_author = $commit['commit']['author'] ?? array();
+            $message_lines = preg_split('/\r\n|\r|\n/', $commit['commit']['message'] ?? '');
+            $filtered_message = array();
+
+            foreach ($message_lines as $line) {
+                if (strpos($line, 'Translate-URL:') !== false) {
+                    continue;
                 }
-    
-                // Generate list items for each commit
-                $output .= '<li>';
-    
-                // Make the author image clickable and link to the user's GitHub profile
-                $output .= '<a href="' . esc_url($commit['author']['html_url']) . '" target="_blank">';
-                $output .= '<img src="' . esc_url($commit['author']['avatar_url']) . '" alt="' . esc_attr($commit['commit']['author']['name']) . '" width="24" height="24" style="vertical-align: middle; margin-right: 8px;" />';
-                $output .= '</a>';
-    
-                // Commit Number (Clickable)
-                $commit_number = substr($commit['sha'], 0, 7); // Extract the first 7 characters
-                $output .= '<a href="' . esc_url($commit['html_url']) . '" target="_blank">Commit #' . esc_html($commit_number) . '</a>';
-    
-                // Commit Message (remove any line breaks within the commit message)
-                $output .= ' - ' . esc_html($filtered_message);
-    
-                // Calculate the time since the commit was created
-                $time_since_creation = time_since_creation($commit['commit']['author']['date']);
-                $output .= ' - Since (' . $time_since_creation . ')';
-    
-                // Make the author name clickable and link to the user's GitHub profile
-                $output .= ' - <a href="' . esc_url($commit['author']['html_url']) . '" target="_blank">' . esc_html($commit['commit']['author']['name']) . '</a>';
-    
-                $output .= '</li>';
-            } else {
-                // Handle incomplete commit data
-                $output .= '<li>Weblate translation commit.</li>';
+
+                $line = trim($line);
+                if ($line !== '') {
+                    $filtered_message[] = $line;
+                }
             }
+
+            $display_message = trim(implode(' ', $filtered_message));
+            $author_name = $commit_author['name'] ?? __('Unknown author', 'WS-Sync-with-Github');
+            $author_url = $author['html_url'] ?? '';
+            $avatar_url = $author['avatar_url'] ?? '';
+            $commit_number = substr($commit['sha'] ?? '', 0, 7);
+
+            $output .= gitsync_build_list_item(
+                'Commit #' . $commit_number,
+                $commit['html_url'] ?? '',
+                $display_message,
+                gitsync_time_since_creation($commit_author['date'] ?? ''),
+                $author_name,
+                $author_url,
+                $avatar_url,
+                $author_name
+            );
         }
         $output .= '</ul>';
     } else {
@@ -218,41 +250,27 @@ function gitsync_pull_requests_shortcode($atts) {
         'owner' => '',
     ), $atts, 'gitsync_pull_requests');
 
-    // Make API request for open pull requests using cURL
-    $pulls_api_url = "https://api.github.com/repos/{$atts['owner']}/{$atts['repository']}/pulls?state=open";
-    $headers = array(
-        'Authorization: token ' . $atts['token'],
-        'User-Agent: Your-User-Agent', // Add your own User-Agent here
-    );
+    $owner = sanitize_text_field($atts['owner']);
+    $repository = sanitize_text_field($atts['repository']);
+    $token = trim($atts['token']);
 
-    // Initialize cURL session for pull requests
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $pulls_api_url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-    // Execute cURL session for pull requests
-    $pulls_response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-    // Close cURL session for pull requests
-    curl_close($ch);
-
-    // Check if the API request for pull requests was successful
-    if ($http_code !== 200) {
-        return '<p>Error retrieving pull requests data from GitHub API.</p>';
+    if (empty($owner) || empty($repository)) {
+        return gitsync_render_error('Repository owner and repository name are required.');
     }
 
-    // Check if the response is valid JSON
-    $pulls_data = json_decode($pulls_response, true);
+    $pulls_api_url = add_query_arg(array('state' => 'open', 'per_page' => 100), sprintf('https://api.github.com/repos/%s/%s/pulls', rawurlencode($owner), rawurlencode($repository)));
+    $pulls_data = gitsync_fetch_github_data($pulls_api_url, $token);
 
-    // Display the data
-    $output = ''; // Initialize output variable
+    if (is_wp_error($pulls_data)) {
+        return gitsync_render_error('Error retrieving pull requests data from GitHub API.');
+    }
+
+    $output = '';
 
     if (!empty($pulls_data)) {
         // Sort pull requests by created_at date in descending order (newest to oldest)
         usort($pulls_data, function ($a, $b) {
-            return strtotime($b['created_at']) - strtotime($a['created_at']);
+            return strtotime($b['created_at'] ?? '') <=> strtotime($a['created_at'] ?? '');
         });
 
         // Get the latest 10 pull requests
@@ -261,28 +279,17 @@ function gitsync_pull_requests_shortcode($atts) {
         // Display pull requests
         $output .= '<ul>';
         foreach ($last_10_pulls as $pull) {
-            // Generate list items for each pull request
-            $output .= '<li>';
-
-            // Make the author image clickable and link to the user's GitHub profile
-            $output .= '<a href="' . esc_url($pull['user']['html_url']) . '" target="_blank">';
-            $output .= '<img src="' . esc_url($pull['user']['avatar_url']) . '" alt="' . esc_attr($pull['user']['login']) . '" width="24" height="24" style="vertical-align: middle; margin-right: 8px;" />';
-            $output .= '</a>';
-
-            // Pull Request Number (Clickable)
-            $output .= '<a href="' . esc_url($pull['html_url']) . '" target="_blank">PR #' . esc_html($pull['number']) . '</a>';
-
-            // Pull Request Title
-            $output .= ' - ' . esc_html($pull['title']);
-
-            // Calculate the time since the pull request was created
-            $time_since_creation = time_since_creation($pull['created_at']);
-            $output .= ' - Since (' . $time_since_creation . ')';
-
-            // Make the author name clickable and link to the user's GitHub profile
-            $output .= ' - <a href="' . esc_url($pull['user']['html_url']) . '" target="_blank">' . esc_html($pull['user']['login']) . '</a>';
-
-            $output .= '</li>';
+            $user = $pull['user'] ?? array();
+            $output .= gitsync_build_list_item(
+                'PR #' . ($pull['number'] ?? ''),
+                $pull['html_url'] ?? '',
+                $pull['title'] ?? '',
+                gitsync_time_since_creation($pull['created_at'] ?? ''),
+                $user['login'] ?? '',
+                $user['html_url'] ?? '',
+                $user['avatar_url'] ?? '',
+                $user['login'] ?? ''
+            );
         }
         $output .= '</ul>';
     } else {

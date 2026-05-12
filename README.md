@@ -56,14 +56,24 @@ Displays a list of open pull requests from a GitHub repository.
 
 ### Important Notes
 
-- Before using these shortcodes, make sure you have a valid GitHub personal access token. You can create a token with appropriate permissions in your GitHub account settings.
+- For public repositories, the shortcodes work without a token. Add a GitHub personal access token if you need better rate limits or private repo access.
 
 - Replace `YourGitHubToken`, `YourRepository`, and `OwnerOfRepo` with the appropriate values for your GitHub repository.
 
-- Ensure that cURL is enabled on your server to make API requests to GitHub.
+- The plugin uses the WordPress HTTP API, so cURL-specific setup is no longer required.
 
-- Add your own User-Agent in the code (where specified) to comply with GitHub API guidelines.
+- The plugin now sends a WordPress-safe User-Agent automatically.
 
 - Insert the desired shortcode into your WordPress post, page, or widget to display GitHub repository information on your website.
 
 Enjoy displaying GitHub repository data on your WordPress site using these simple and efficient shortcodes!
+
+## Change Log
+
+### v1.1
+
+- Replaced raw cURL requests with the WordPress HTTP API.
+- Added input validation for repository owner and name.
+- Added short-term caching with transients to reduce GitHub API calls.
+- Improved escaping and added `rel="noopener noreferrer"` to external links.
+- Made commit, issue, and pull request rendering more tolerant of missing GitHub fields.
